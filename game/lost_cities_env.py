@@ -1,5 +1,6 @@
 import numpy as np
 from typing import Tuple, Dict, List, Optional
+from game import utils
 
 class LostCitiesEnv:
     """
@@ -19,7 +20,7 @@ class LostCitiesEnv:
 
         """
         # Initialize the game state with NumPy arrays
-        self.deck = self._create_deck()
+        self.deck = utils.create_deck(self.NUM_SUITS, self.CARDS_PER_HANDSHAKE)
         np.random.shuffle(self.deck)
         
         # 2 for each player
@@ -45,22 +46,6 @@ class LostCitiesEnv:
         self.winner = None
         
         return self._get_state()
-
-    def _create_deck(self) -> np.ndarray:
-        """
-        Creates the deck of cards using NumPy arrays.
-        Returns: Array of shape (60, 2) where each row is [suit, value]
-        Value mapping:
-        - 0: handshake
-        - 2-10: number cards (stored at indices 2-10)
-        """
-        deck = []
-        # Add handshake cards (value 0)
-        for suit in range(self.NUM_SUITS):
-            deck.extend([[suit, 0]] * self.CARDS_PER_HANDSHAKE)
-            # Add number cards (values 2-10)
-            deck.extend([[suit, val] for val in range(2, 11)])
-        return np.array(deck, dtype=np.int8)
 
     def _get_state(self) -> np.ndarray:
         """
@@ -96,29 +81,7 @@ class LostCitiesEnv:
         return np.array(state, dtype=np.float32)
 
     def _is_valid_play(self, suit: int, value: int, player: int) -> bool:
-        """
-        Check if playing a card is valid.
-        Values:
-        - 0: handshake
-        - 2-10: number cards (stored at indices 2-10)
-        """
-        expedition = self.expeditions[player, suit]
-        
-        if np.sum(expedition) == 0:
-            return True  # Empty expedition
-            
-        if value == 0:  # Handshake card
-            # Can only play if no number cards are present
-            return np.sum(expedition[2:]) == 0
-            
-        # Get the highest value card in the expedition
-        number_cards = np.nonzero(expedition[2:])[0]
-        if len(number_cards) == 0:
-            return True
-            
-        # Since indices 2-10 correspond to actual values 2-10, we can use the index directly
-        highest_value = number_cards[-1] + 2
-        return value > highest_value
+        return utils.is_valid_play(self.expeditions[player, suit], suit, value)
 
     def _calculate_score(self, player: int) -> int:
         """
@@ -127,27 +90,7 @@ class LostCitiesEnv:
         total_score = 0
         for suit in range(self.NUM_SUITS):
             expedition = self.expeditions[player, suit]
-            if np.sum(expedition) == 0:
-                continue
-                
-            # Calculate base score
-            # Use actual card values (2-10) for score calculation
-            values = np.arange(2, 11)
-            card_sum = np.sum(values * expedition[2:])
-            
-            # Calculate multiplier (handshake cards + 1)
-            multiplier = expedition[0] + 1
-            
-            # Calculate expedition score
-            score = -20 + card_sum
-            score *= multiplier
-            
-            # Bonus for 8 or more cards
-            if np.sum(expedition) >= 8:
-                score += 20
-                
-            total_score += score
-            
+            total_score += utils.calculate_score(expedition)
         return total_score
 
     def step(self, action: Tuple[int, int, int]) -> Tuple[np.ndarray, float, bool, Dict]:
@@ -217,36 +160,10 @@ class LostCitiesEnv:
         return self._get_state(), reward, self.game_over, {}
 
     def get_valid_actions(self) -> List[Tuple[int, int, int]]:
-        """
-        Generate valid actions using NumPy operations.
-        """
-        valid_actions = []
-        hand = self.player_hands[self.current_player]
-        
-        # Get indices of cards in hand
-        card_indices = np.where(hand > 0)
-        for idx in range(len(card_indices[0])):
-            suit, value = card_indices[0][idx], card_indices[1][idx]
-            card_index = len(np.where(hand.flatten()[:suit * self.NUM_VALUES + value] > 0)[0])
-            
-            # Check play actions
-            if self._is_valid_play(suit, value, self.current_player):
-                # Add valid draw sources
-                valid_actions.extend([
-                    (card_index, 0, 0)  # Draw from deck
-                ])
-                # Add valid discard pile draws
-                for draw_suit in range(self.NUM_SUITS):
-                    if np.sum(self.discard_piles[draw_suit]) > 0:
-                        valid_actions.append((card_index, 0, draw_suit + 1))
-            
-            # Discard actions (always valid)
-            valid_actions.append((card_index, 1, 0))  # Draw from deck
-            for draw_suit in range(self.NUM_SUITS):
-                if np.sum(self.discard_piles[draw_suit]) > 0:
-                    valid_actions.append((card_index, 1, draw_suit + 1))
-        
-        return valid_actions
+        return utils.get_valid_actions(
+            self.player_hands, self.expeditions, self.discard_piles,
+            self.current_player, self.NUM_SUITS, self.NUM_VALUES
+        )
 
     def render(self):
         """

@@ -1,6 +1,7 @@
 import unittest
 import numpy as np
-from lost_cities_env import LostCitiesEnv
+from game.lost_cities_env import LostCitiesEnv
+from game.utils import create_deck
 
 class TestLostCitiesEnv(unittest.TestCase):
     def setUp(self):
@@ -27,7 +28,7 @@ class TestLostCitiesEnv(unittest.TestCase):
 
     def test_deck_creation(self):
         """Test if the deck is created with correct number and types of cards."""
-        deck = self.env._create_deck()
+        deck = create_deck(self.env.NUM_SUITS, self.env.CARDS_PER_HANDSHAKE)
         
         # Test deck size
         self.assertEqual(len(deck), 72)
