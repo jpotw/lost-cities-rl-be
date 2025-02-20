@@ -11,7 +11,16 @@ class LostCitiesNet(nn.Module):
         self.policy_head = nn.Linear(hidden_size, action_size)
         self.value_head = nn.Linear(hidden_size, 1)
 
+        # Initialize weights
+        for layer in [self.fc1, self.fc2, self.fc3, self.policy_head, self.value_head]:
+            nn.init.orthogonal_(layer.weight, gain=1)
+            nn.init.constant_(layer.bias, 0)
+
     def forward(self, x):
+        if not isinstance(x, torch.Tensor):
+            x = torch.from_numpy(x).float()
+        x = x.to(next(self.parameters()).device)  # Move input to same device as model
+        
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
         x = F.relu(self.fc3(x))
