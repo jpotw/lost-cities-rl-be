@@ -47,13 +47,13 @@ class PPOAgent:
       """
       decode the action index to card index, play or discard, draw source
       """
-      #num of possible action for one card is 12 (play (yes/no) * draw_source (0~5))
+      #num of possible action for one card is 12 (play (yes/no) * draw_source (0~6))
       #num of card in hand at max is 8
-      n_action_per_card = 6 * 2
+      n_action_per_card = 7 * 2
       card_index = action_index // n_action_per_card
       remainder = action_index % n_action_per_card
-      play_or_discard = remainder // 6
-      draw_source = remainder % 6
+      play_or_discard = remainder // 7
+      draw_source = remainder % 7
       return (card_index, play_or_discard, draw_source)
     
     
@@ -62,8 +62,8 @@ class PPOAgent:
         encode the action to action index
         """
         card_index, play_or_discard, draw_source = action
-        n_action_per_card = 6*2
-        return card_index * n_action_per_card + play_or_discard * 6 + draw_source
+        n_action_per_card = 7*2
+        return card_index * n_action_per_card + play_or_discard * 7 + draw_source
 
     def compute_returns(self, rewards):
       """

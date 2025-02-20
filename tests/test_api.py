@@ -5,6 +5,12 @@ from api import app
 client = TestClient(app)
 
 @pytest.mark.asyncio
+async def test_health_check():
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
+@pytest.mark.asyncio
 async def test_get_ai_move():
     response = client.post(
         "/get_ai_move",

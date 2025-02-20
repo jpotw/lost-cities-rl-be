@@ -1,5 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+from models.model import LostCitiesNet
+from models.ppo_agent import PPOAgent
 
 app = FastAPI()
 
@@ -30,6 +32,16 @@ class GameState(BaseModel):
 
 class AIMoveResponse(BaseModel):
     action: tuple[int, int, int]
+
+
+STATE_SIZE = 221
+ACTION_SIZE = 8 * 2 * 7
+HIDDEN_SIZE = 256
+
+# Placeholder - create a random model for now
+model = LostCitiesNet(STATE_SIZE, ACTION_SIZE, HIDDEN_SIZE)
+agent = PPOAgent(STATE_SIZE, ACTION_SIZE, HIDDEN_SIZE)
+agent.model = model  # Set the agent's model
 
     
 @app.get("/health")
