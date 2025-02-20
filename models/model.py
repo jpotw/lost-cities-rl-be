@@ -14,7 +14,7 @@ class LostCitiesNet(nn.Module):
     def forward(self, x):
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
-        x = F.relu(self.fc3(x)) # Use third layer
+        x = F.relu(self.fc3(x))
         policy_logits = self.policy_head(x)
         value = self.value_head(x)
         return policy_logits, value
