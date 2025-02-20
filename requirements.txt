@@ -2,8 +2,8 @@ fastapi
 uvicorn
 pydantic
 python-dotenv
-torch
-numpy
+torch==2.2.1+cpu
+numpy<2.0.0
 httpx
 pytest
 pytest-asyncio

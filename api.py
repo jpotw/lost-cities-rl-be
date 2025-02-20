@@ -4,7 +4,7 @@ from models.model import LostCitiesNet
 from models.ppo_agent import PPOAgent
 from game.lost_cities_env import LostCitiesEnv
 import torch
-app = FastAPI()
+app = FastAPI(root_path="/api")
 
 class Card(BaseModel):
     id: int
