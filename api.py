@@ -4,12 +4,14 @@ from models.model import LostCitiesNet
 from models.ppo_agent import PPOAgent
 from game.lost_cities_env import LostCitiesEnv
 import torch
+from typing import Union
+
 app = FastAPI(root_path="/api")
 
 class Card(BaseModel):
     id: int
     suit: str
-    value: int | str
+    value: Union[str, int]
     isHidden: bool
 
 class PlayerState(BaseModel):
@@ -25,11 +27,11 @@ class GameState(BaseModel):
     currentPlayerIndex: int
     deck: list[Card]
     discardPiles: dict[str, list[Card]]
-    selectedCard: Card | None
+    selectedCard: Union[Card, None]
     gamePhase: str
-    isAIThinking: bool | None = None
-    lastDiscarded: dict[str, str | int] | None = None # str(suit), str(handshake cards) | value(number cards)
-    winner: str | None
+    isAIThinking: Union[bool, None] = None
+    lastDiscarded: Union[dict[str, Union[str, int]], None] = None # str(suit), str(handshake cards) | value(number cards)
+    winner: Union[str, None] = None
 
 class AIMoveResponse(BaseModel):
     action: tuple[int, int, int]

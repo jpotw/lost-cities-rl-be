@@ -2,7 +2,8 @@ fastapi
 uvicorn
 pydantic
 python-dotenv
-torch==2.2.1+cpu
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.2.1
 numpy<2.0.0
 httpx
 pytest
