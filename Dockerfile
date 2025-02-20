@@ -23,7 +23,7 @@ COPY --from=builder /usr/local/bin/ /usr/local/bin/
 # Copy application code
 COPY . .
 
-EXPOSE 7860
+EXPOSE 8080
 
 # Run the application
-CMD ["uvicorn", "api:app", "--host", "0.0.0.0", "--port", "7860"]
+CMD ["uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8080"]

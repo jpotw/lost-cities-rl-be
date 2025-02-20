@@ -4,7 +4,7 @@ emoji: 🎮
 colorFrom: blue
 colorTo: green
 sdk: docker
-app_port: 7860
+app_port: 8080
 pinned: false
 ---
 
@@ -42,5 +42,5 @@ If you have Docker Desktop installed in Windows and are using WSL:
 To build and run locally:
 ```bash
 docker build -t lost-cities-rl-be .
-docker run -p 7860:7860 lost-cities-rl-be
+docker run -p 8080:8080 lost-cities-rl-be
 ``` 
