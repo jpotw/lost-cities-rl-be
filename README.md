@@ -1,10 +1,16 @@
-# lost-cities-rl-be
-
-## Configuration
-
-```yaml
+---
+title: Lost Cities RL Backend
+emoji: 🎮
+colorFrom: blue
+colorTo: green
 sdk: docker
-```
+app_port: 7860
+pinned: false
+---
+
+# Lost Cities RL Backend
+
+This is the backend service for the Lost Cities Reinforcement Learning project.
 
 ## Development
 
@@ -18,9 +24,9 @@ pip install -r requirements.txt
 uvicorn api:app --reload
 ```
 
-## Deployment
+## Docker Deployment
 
-The service is configured to be deployed using Docker. The Dockerfile is set up to use multi-stage builds for optimized image size and build time.
+The service is configured to be deployed using Docker with multi-stage builds for optimized image size and build time.
 
 ### Using Docker with WSL
 
