@@ -6,6 +6,7 @@ from game.lost_cities_env import LostCitiesEnv
 import torch
 from typing import Union, List, Dict, Any
 from train import load_model
+import os
 
 app = FastAPI()
 
@@ -62,6 +63,13 @@ class LostCitiesAPI:
 
     def load_model(self, model_path):
         """Load the trained model and initialize the agent"""
+        # Try to load the model, if not found, generate a dummy model
+        if not os.path.exists(model_path):
+            print(f"Model not found at {model_path}, generating dummy model...")
+            model = LostCitiesNet(STATE_SIZE, ACTION_SIZE, HIDDEN_SIZE).to(device)
+            torch.save(model.state_dict(), model_path)
+            print(f"Dummy model saved to {model_path}")
+        
         self.agent = load_model(model_path)
         if self.agent is not None:
             print("Agent loaded successfully with the following configuration:")

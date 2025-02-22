@@ -3,7 +3,7 @@ uvicorn
 pydantic
 python-dotenv
 --extra-index-url https://download.pytorch.org/whl/cpu
-torch==2.2.1
+torch==2.2.1+cpu
 numpy<2.0.0
 httpx
 pytest
