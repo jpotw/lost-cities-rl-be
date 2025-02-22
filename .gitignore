@@ -55,3 +55,9 @@ htmlcov/
 .cache
 coverage.xml
 *.cover 
+
+
+# pytest
+pytest_cache/
+
+explanations/
