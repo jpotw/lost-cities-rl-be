@@ -99,6 +99,9 @@ class LostCitiesAPI:
         """Initialize a new game and return the game state"""
         initial_state = self.env.reset()
         
+        # Keep track of the next available card ID
+        next_card_id = 1
+        
         # Convert environment state to GameState format
         game_state = GameState(
             players=[
@@ -108,12 +111,14 @@ class LostCitiesAPI:
                     type="HUMAN",
                     hand=[
                         Card(
-                            id=i,
-                            suit=self.env.index_to_suit(card[0]),
-                            value="HS" if card[1] == 0 else str(card[1]),
+                            id=next_card_id + i,
+                            suit=self.env.index_to_suit(suit),
+                            value="HS" if value == 0 else str(value),
                             isHidden=False
                         )
-                        for i, card in enumerate(self.env.get_player_hand(0))
+                        for suit in range(self.env.NUM_SUITS)
+                        for value in range(self.env.NUM_VALUES)
+                        for i in range(int(self.env.player_hands[0, suit, value]))
                     ],
                     expeditions={suit: [] for suit in ["RED", "BLUE", "GREEN", "WHITE", "YELLOW", "PURPLE"]},
                     score=0
@@ -124,12 +129,14 @@ class LostCitiesAPI:
                     type="AI",
                     hand=[
                         Card(
-                            id=i + 8,
-                            suit=self.env.index_to_suit(card[0]),
-                            value="HS" if card[1] == 0 else str(card[1]),
+                            id=next_card_id + i + 100,  # Offset AI cards by 100 to ensure uniqueness
+                            suit=self.env.index_to_suit(suit),
+                            value="HS" if value == 0 else str(value),
                             isHidden=True
                         )
-                        for i, card in enumerate(self.env.get_player_hand(1))
+                        for suit in range(self.env.NUM_SUITS)
+                        for value in range(self.env.NUM_VALUES)
+                        for i in range(int(self.env.player_hands[1, suit, value]))
                     ],
                     expeditions={suit: [] for suit in ["RED", "BLUE", "GREEN", "WHITE", "YELLOW", "PURPLE"]},
                     score=0
@@ -138,7 +145,7 @@ class LostCitiesAPI:
             currentPlayerIndex=0,
             deck=[
                 Card(
-                    id=i + 16,
+                    id=next_card_id + i + 200,  # Offset deck cards by 200 to ensure uniqueness
                     suit=self.env.index_to_suit(card[0]),
                     value="HS" if card[1] == 0 else str(card[1]),
                     isHidden=True

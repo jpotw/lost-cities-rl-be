@@ -209,3 +209,8 @@ class LostCitiesEnv:
                 print(f"Winner: Player {self.winner}")
             else:
                 print("Game ended in a draw")
+
+    def index_to_suit(self, suit_index: int) -> str:
+        """Convert numeric suit index to suit name"""
+        suits = ["RED", "BLUE", "GREEN", "WHITE", "YELLOW", "PURPLE"]
+        return suits[suit_index]
