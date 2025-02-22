@@ -4,9 +4,13 @@ emoji: 🎮
 colorFrom: blue
 colorTo: green
 sdk: docker
+sdk_version: "3.0"
+app_file: api.py
 app_port: 8080
 pinned: false
 ---
+
+Check out the configuration reference at https://huggingface.co/docs/hub/spaces-config-reference
 
 # Lost Cities RL Backend
 
