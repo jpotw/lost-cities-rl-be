@@ -17,21 +17,18 @@ class LostCitiesEnv:
     def reset(self):
         """
         Resets the game state.
-
         """
         # Initialize the game state with NumPy arrays
         self.deck = utils.create_deck(self.NUM_SUITS, self.CARDS_PER_HANDSHAKE)
         np.random.shuffle(self.deck)
         
-        # 2 for each player
-        # Player hands: shape (2, 6(NUM_SUITS), 10(NUM_VALUES)) - count of each card type
+        # Player hands: shape (2, 6(NUM_SUITS), 11(NUM_VALUES)) - count of each card type
         self.player_hands = np.zeros((2, self.NUM_SUITS, self.NUM_VALUES), dtype=np.int8)
         
-        # Expeditions: shape (2, 6(NUM_SUITS), 10(NUM_VALUES)) - count of each card type
+        # Expeditions: shape (2, 6(NUM_SUITS), 11(NUM_VALUES)) - count of each card type
         self.expeditions = np.zeros((2, self.NUM_SUITS, self.NUM_VALUES), dtype=np.int8)
         
-        # 2 players share the same discard piles
-        # Discard piles: shape (6(NUM_SUITS), 10(NUM_VALUES)) - count of each card type
+        # Discard piles: shape (6(NUM_SUITS), 11(NUM_VALUES)) - count of each card type
         self.discard_piles = np.zeros((self.NUM_SUITS, self.NUM_VALUES), dtype=np.int8)
         
         # Deal initial hands
@@ -47,37 +44,35 @@ class LostCitiesEnv:
         
         return self._get_state()
 
+    def get_player_hand(self, player: int) -> List[Tuple[int, int]]:
+        """
+        Return the hand of the specified player as a list of (suit, value) tuples.
+        """
+        hand = []
+        for suit in range(self.NUM_SUITS):
+            for value in range(self.NUM_VALUES):
+                count = self.player_hands[player, suit, value]
+                if count > 0:
+                    hand.extend([(suit, value)] * count)
+        return hand
+
+    def index_to_suit(self, index: int) -> str:
+        """
+        Convert suit index to string representation.
+        """
+        suits = ["RED", "BLUE", "GREEN", "WHITE", "YELLOW", "PURPLE"]
+        return suits[index]
+
     def _get_state(self) -> np.ndarray:
         """
         Returns a numerical representation of the game state.
-        NUM_SUITS = 6, NUM_VALUES = 10
-        # Output shape: (60) + (60) + (60) + (60) + 1
-        
-        This includes: 
-        1) the current player's hand in a flattened array
-        2) the current player's expeditions in a flattened array
-        3) the opponent's expeditions in a flattened array
-        4) the discard piles in a flattened array
-        5) the size of the deck normalized by the total number of cards (72)
         """
-        # Flatten and concatenate all state components
         state = []
-        
-        # Current player's hand
         state.extend(self.player_hands[self.current_player].flatten())
-        
-        # Current player's expeditions
         state.extend(self.expeditions[self.current_player].flatten())
-        
-        # Opponent's expeditions
         state.extend(self.expeditions[1 - self.current_player].flatten())
-        
-        # Discard piles
         state.extend(self.discard_piles.flatten())
-        
-        # Deck size (normalized)
         state.append(len(self.deck) / 72.0)
-        
         return np.array(state, dtype=np.float32)
 
     def _is_valid_play(self, suit: int, value: int, player: int) -> bool:
@@ -96,9 +91,7 @@ class LostCitiesEnv:
     def step(self, action: Tuple[int, int, int]) -> Tuple[np.ndarray, float, bool, Dict]:
         """
         Execute an action and return the next state.
-        action: (card_index, play_or_discard, draw_source)
         """
-
         card_index, play_or_discard, draw_source = action
         
         # Convert card_index to suit and value
@@ -129,7 +122,6 @@ class LostCitiesEnv:
         else:  # Draw from discard pile
             discard_suit = draw_source - 1
             if np.sum(self.discard_piles[discard_suit]) == 0:
-                # Reverse the play/discard
                 if play_or_discard == 0:
                     self.expeditions[self.current_player, suit, value] -= 1
                 else:
@@ -137,7 +129,6 @@ class LostCitiesEnv:
                 self.player_hands[self.current_player, suit, value] += 1
                 raise ValueError("Cannot draw from empty discard pile")
                 
-            # Find the top card in the discard pile
             flat_index = np.where(self.discard_piles[discard_suit] > 0)[0][-1]
             self.discard_piles[discard_suit, flat_index] -= 1
             self.player_hands[self.current_player, discard_suit, flat_index] += 1
@@ -151,7 +142,7 @@ class LostCitiesEnv:
         if self.game_over:
             player_score = self._calculate_score(self.current_player)
             opponent_score = self._calculate_score(1 - self.current_player)
-            reward = int(player_score - opponent_score)  # Convert numpy int to Python int
+            reward = int(player_score - opponent_score)
             self.winner = 0 if player_score > opponent_score else (1 if opponent_score > player_score else -1)
         
         # Switch players
@@ -209,8 +200,3 @@ class LostCitiesEnv:
                 print(f"Winner: Player {self.winner}")
             else:
                 print("Game ended in a draw")
-
-    def index_to_suit(self, suit_index: int) -> str:
-        """Convert numeric suit index to suit name"""
-        suits = ["RED", "BLUE", "GREEN", "WHITE", "YELLOW", "PURPLE"]
-        return suits[suit_index]
