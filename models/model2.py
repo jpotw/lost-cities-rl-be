@@ -1,8 +1,49 @@
+"""Alternative neural network model for Lost Cities game with residual connections."""
+
+from typing import Tuple, Union
+
+import numpy as np
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from numpy.typing import NDArray
+
 
 class LostCitiesNet(nn.Module):
-    def __init__(self, state_size, action_size, hidden_size=256, dropout_prob=0.5):
+    """Neural network model for Lost Cities game with residual connections.
+
+    This model takes a game state as input and outputs both a policy (action probabilities)
+    and a value estimate. The architecture consists of three fully connected layers with
+    residual connections, batch normalization, and dropout, followed by separate policy
+    and value heads.
+
+    Attributes:
+        dropout_prob: Dropout probability.
+        fc1: First fully connected layer.
+        bn1: First batch normalization layer.
+        fc2: Second fully connected layer.
+        bn2: Second batch normalization layer.
+        fc3: Third fully connected layer.
+        bn3: Third batch normalization layer.
+        policy_head: Output layer for policy (action probabilities).
+        value_head: Output layer for value estimate.
+    """
+
+    def __init__(
+        self,
+        state_size: int,
+        action_size: int,
+        hidden_size: int = 256,
+        dropout_prob: float = 0.5,
+    ) -> None:
+        """Initialize the network.
+
+        Args:
+            state_size: Size of the input state vector.
+            action_size: Size of the action space.
+            hidden_size: Size of hidden layers (default: 256).
+            dropout_prob: Dropout probability (default: 0.5).
+        """
         super(LostCitiesNet, self).__init__()
 
         self.dropout_prob = dropout_prob
@@ -26,7 +67,24 @@ class LostCitiesNet(nn.Module):
         # Initialize policy head with orthogonal initialization
         nn.init.orthogonal_(self.policy_head.weight, gain=1)
 
-    def forward(self, x):
+    def forward(
+        self, x: Union[torch.Tensor, NDArray[np.float32]]
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Forward pass through the network.
+
+        Args:
+            x: Input state tensor or numpy array.
+
+        Returns:
+            Tuple containing:
+                - Policy logits (unnormalized action probabilities)
+                - Value estimate
+        """
+        # Convert numpy array to tensor if needed
+        if not isinstance(x, torch.Tensor):
+            x = torch.from_numpy(x).float()
+        x = x.to(next(self.parameters()).device)  # Move input to same device as model
+
         # First layer
         x = F.relu(self.bn1(self.fc1(x)))
         x = F.dropout(x, p=self.dropout_prob, training=self.training)

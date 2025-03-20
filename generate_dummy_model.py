@@ -1,6 +1,7 @@
+"""Script to generate a dummy model for testing."""
+
 import torch
 import torch.nn as nn
-import numpy as np
 
 NUM_COLORS = 6
 NUM_VALUES = 11  # 0 (handshake) and 2-10 (number cards)
@@ -14,9 +15,9 @@ model = nn.Sequential(
     nn.ReLU(),
     nn.Linear(HIDDEN_SIZE, HIDDEN_SIZE),
     nn.ReLU(),
-    nn.Linear(HIDDEN_SIZE, ACTION_SIZE)
+    nn.Linear(HIDDEN_SIZE, ACTION_SIZE),
 )
 
 # Save the model
 torch.save(model.state_dict(), "model.pth")
-print("Dummy model generated and saved as model.pth") 
+print("Dummy model generated and saved as model.pth")

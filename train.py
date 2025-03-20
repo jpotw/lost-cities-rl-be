@@ -1,12 +1,20 @@
+"""Training script for the Lost Cities reinforcement learning agent."""
+
+from typing import Optional, Union
+
 import numpy as np
+import torch
+from torch import device as Device
+
 from game.lost_cities_env import LostCitiesEnv
 from models.model import LostCitiesNet
 from models.ppo_agent import PPOAgent
-import torch
 
-# Hyperparameters 
+# Hyperparameters
 STATE_SIZE = 265
-ACTION_SIZE = 8 * 2 * 7  # 8 cards × 2 actions (play/discard) × 7 draw sources (deck + 6 discard piles)
+ACTION_SIZE = (
+    8 * 2 * 7
+)  # 8 cards × 2 actions (play/discard) × 7 draw sources (deck + 6 discard piles)
 HIDDEN_SIZE = 256
 LEARNING_RATE = 3e-4
 GAMMA = 0.99
@@ -17,15 +25,29 @@ NUM_GAMES = 20000
 BATCH_SIZE = 2048
 NUM_EPOCHS = 10
 PRINT_INTERVAL = 100
-SAVE_INTERVAL = 1000 
+SAVE_INTERVAL = 1000
 
-def load_model(model_path="model_final.pth", device=None):
+
+def load_model(
+    model_path: str, device: Optional[Union[str, Device]] = None
+) -> Optional[PPOAgent]:
+    """Load a trained model from the specified path.
+
+    Args:
+        model_path: Path to the saved model file.
+        device: Device to load the model on ('cuda' or 'cpu').
+
+    Returns:
+        PPOAgent: Loaded agent if successful, None otherwise.
+    """
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    
+    elif isinstance(device, str):
+        device = torch.device(device)
+
     # Create model with same architecture as training
     model = LostCitiesNet(STATE_SIZE, ACTION_SIZE, HIDDEN_SIZE)
-    
+
     try:
         # Load the state dict
         state_dict = torch.load(model_path, map_location=device)
@@ -33,22 +55,22 @@ def load_model(model_path="model_final.pth", device=None):
         model.to(device)
         model.eval()  # Set to evaluation mode
         print(f"Model loaded successfully from {model_path}")
-        
+
         # Create agent with loaded model
         agent = PPOAgent(
-            STATE_SIZE, 
-            ACTION_SIZE, 
+            STATE_SIZE,
+            ACTION_SIZE,
             HIDDEN_SIZE,
             lr=LEARNING_RATE,
             gamma=GAMMA,
             clip_ratio=CLIP_RATIO,
             entropy_coef=ENTROPY_COEF,
             value_loss_coef=VALUE_LOSS_COEF,
-            device=device
+            device=device,
         )
         agent.model = model
         return agent
-        
+
     except FileNotFoundError:
         print(f"Warning: {model_path} not found. Please train the model first.")
         return None
@@ -56,11 +78,42 @@ def load_model(model_path="model_final.pth", device=None):
         print(f"Error loading model: {str(e)}")
         return None
 
-def train():
-    env = LostCitiesEnv()
-    agent = PPOAgent(STATE_SIZE, ACTION_SIZE, HIDDEN_SIZE, LEARNING_RATE, GAMMA, CLIP_RATIO, ENTROPY_COEF, VALUE_LOSS_COEF)
 
-    for game in range(NUM_GAMES):
+def train(
+    num_episodes: int = NUM_GAMES,
+    batch_size: int = BATCH_SIZE,
+    save_interval: int = SAVE_INTERVAL,
+    model_path: str = "model_final.pth",
+    device: Optional[Union[str, Device]] = None,
+) -> None:
+    """Train the Lost Cities agent using PPO.
+
+    Args:
+        num_episodes: Number of episodes to train for.
+        batch_size: Number of episodes per batch.
+        save_interval: How often to save model checkpoints.
+        model_path: Path to save the trained model.
+        device: Device to train on ('cuda' or 'cpu').
+    """
+    if device is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    elif isinstance(device, str):
+        device = torch.device(device)
+
+    env = LostCitiesEnv()
+    agent = PPOAgent(
+        STATE_SIZE,
+        ACTION_SIZE,
+        HIDDEN_SIZE,
+        LEARNING_RATE,
+        GAMMA,
+        CLIP_RATIO,
+        ENTROPY_COEF,
+        VALUE_LOSS_COEF,
+        device=device,
+    )
+
+    for game in range(num_episodes):
         state = env.reset()
         done = False
         states, actions, log_probs, rewards = [], [], [], []
@@ -75,24 +128,41 @@ def train():
             state = next_state
 
         returns = agent.compute_returns(rewards)
-        advantages = returns - agent.model(torch.tensor(np.array(states),dtype=torch.float32).to(agent.device))[1].squeeze().detach()
+        advantages = (
+            returns
+            - agent.model(
+                torch.tensor(np.array(states), dtype=torch.float32).to(agent.device)
+            )[1]
+            .squeeze()
+            .detach()
+        )
         advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
 
         # Update in batches
         for _ in range(NUM_EPOCHS):
-          for i in range(0, len(states), BATCH_SIZE):
-            batch_states = states[i:i + BATCH_SIZE]
-            batch_actions = actions[i:i + BATCH_SIZE]
-            batch_log_probs = log_probs[i:i + BATCH_SIZE]
-            batch_returns = returns[i:i + BATCH_SIZE]
-            batch_advantages = advantages[i:i + BATCH_SIZE]
-            loss = agent.update(batch_states, batch_actions, batch_log_probs, batch_returns, batch_advantages)
+            for i in range(0, len(states), batch_size):
+                batch_states = states[i : i + batch_size]
+                batch_actions = actions[i : i + batch_size]
+                batch_log_probs = log_probs[i : i + batch_size]
+                batch_returns = returns[i : i + batch_size]
+                batch_advantages = advantages[i : i + batch_size]
+                loss = agent.update(
+                    batch_states,
+                    batch_actions,
+                    batch_log_probs,
+                    batch_returns,
+                    batch_advantages,
+                )
 
         if (game + 1) % PRINT_INTERVAL == 0:
-            print(f"Game: {game + 1}, Loss: {loss:.4f}, Reward: {sum(rewards):.2f}, Winner : {env.winner}")
-        if (game + 1) % SAVE_INTERVAL == 0:
-          torch.save(agent.model.state_dict(), f"model_{game + 1}.pth")
-    torch.save(agent.model.state_dict(), "model_final.pth")
+            print(
+                f"Game: {game + 1}, Loss: {loss:.4f}, "
+                f"Reward: {sum(rewards):.2f}, Winner: {env.winner}"
+            )
+        if (game + 1) % save_interval == 0:
+            torch.save(agent.model.state_dict(), f"model_{game + 1}.pth")
+    torch.save(agent.model.state_dict(), model_path)
+
 
 if __name__ == "__main__":
     train()

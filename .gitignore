@@ -54,11 +54,17 @@ htmlcov/
 .coverage.*
 .cache
 coverage.xml
-*.cover 
+*.cover
 
 
 # pytest
 pytest_cache/
+.pytest_cache/
+
+# Linting and type checking
+.mypy_cache/
+.ruff_cache/
+.pytype/
 
 explanations/
 model_history/

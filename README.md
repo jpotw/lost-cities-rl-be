@@ -23,9 +23,33 @@ This is the backend service for the Lost Cities Reinforcement Learning project.
 pip install -r requirements.txt
 ```
 
-2. Run the server:
+2. For development, install additional tooling:
+```bash
+pip install -r requirements-dev.txt
+```
+
+3. Set up pre-commit hooks:
+```bash
+pre-commit install
+```
+
+4. Run the server:
 ```bash
 uvicorn api:app --reload
+```
+
+## Development Tooling
+
+The project uses pre-commit hooks to ensure code quality. These include:
+- black (code formatting)
+- isort (import sorting)
+- flake8 (linting)
+- mypy (type checking)
+- Various file checks (trailing whitespace, merge conflicts, etc.)
+
+To manually run all checks on all files:
+```bash
+pre-commit run --all-files
 ```
 
 ## Docker Deployment
@@ -47,4 +71,4 @@ To build and run locally:
 ```bash
 docker build -t lost-cities-rl-be .
 docker run -p 8080:8080 lost-cities-rl-be
-``` 
+```

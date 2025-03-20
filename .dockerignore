@@ -55,7 +55,7 @@
 **/.coverage.*
 **/.cache
 **/coverage.xml
-**/*.cover 
+**/*.cover
 
 
 # pytest
