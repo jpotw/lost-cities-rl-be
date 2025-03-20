@@ -61,3 +61,5 @@ coverage.xml
 pytest_cache/
 
 explanations/
+model_history/
+model_versions/

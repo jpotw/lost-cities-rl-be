@@ -48,7 +48,7 @@ class PPOAgent:
         """
         decode the action index to card index, play or discard, draw source
         """
-        #num of possible action for one card is 12 (play (yes/no) * draw_source (0~6))
+        #num of possible action for one card is 14 (play (yes/no) * draw_source (0~6))
         #num of card in hand at max is 8
         n_action_per_card = 7 * 2
         card_index = action_index // n_action_per_card

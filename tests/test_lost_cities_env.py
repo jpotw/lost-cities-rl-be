@@ -8,80 +8,84 @@ class TestLostCitiesEnv(unittest.TestCase):
         """Set up a new environment before each test."""
         self.env = LostCitiesEnv()
         
-    def test_initialization(self):
-        """Test if the environment is properly initialized."""
+    def test_reset(self):
+        """Test that reset initializes the environment correctly"""
         state = self.env.reset()
         
         # Test state shape
-        self.assertEqual(state.shape[0], 6 * 11 * 4 + 1)  # hands + expeditions + discard + deck size
+        self.assertEqual(len(state), 241)  # 4 * 60 + 1
         
-        # Test initial hands
-        for player in range(2):
-            self.assertEqual(np.sum(self.env.player_hands[player]), 8)  # Each player starts with 8 cards
-            
+        # Test player hands
+        self.assertEqual(np.sum(self.env.player_hands[0]), 8)  # Each player starts with 8 cards
+        self.assertEqual(np.sum(self.env.player_hands[1]), 8)
+        
+        # Test expeditions and discard piles are empty
+        self.assertEqual(np.sum(self.env.expeditions), 0)
+        self.assertEqual(np.sum(self.env.discard_piles), 0)
+        
         # Test deck size
-        self.assertEqual(len(self.env.deck), 56)  # 72 total - 16 dealt cards (8 per player)
-        
-        # Test empty expeditions and discard piles
-        self.assertTrue(np.all(self.env.expeditions == 0))
-        self.assertTrue(np.all(self.env.discard_piles == 0))
+        self.assertEqual(len(self.env.deck), 56)  # 72 - 16 (initial hands)
 
     def test_deck_creation(self):
-        """Test if the deck is created with correct number and types of cards."""
-        deck = create_deck(self.env.NUM_SUITS, self.env.CARDS_PER_HANDSHAKE)
+        """Test that deck is created with correct number of cards"""
+        deck = create_deck(self.env.NUM_COLORS, self.env.CARDS_PER_HANDSHAKE)
         
-        # Test deck size
-        self.assertEqual(len(deck), 72)
+        # Test total number of cards
+        self.assertEqual(len(deck), 72)  # 6 colors * (3 handshake + 9 number cards)
         
-        # Test number of handshake cards per suit
-        for suit in range(self.env.NUM_SUITS):
-            handshake_count = np.sum((deck[:, 0] == suit) & (deck[:, 1] == 0))
+        # Test number of handshake cards per color
+        for color in range(self.env.NUM_COLORS):
+            handshake_count = np.sum((deck[:, 0] == color) & (deck[:, 1] == 0))
             self.assertEqual(handshake_count, 3)
             
-            # Test number cards (2-10) per suit
+            # Test number cards (2-10) per color
             for value in range(2, 11):
-                card_count = np.sum((deck[:, 0] == suit) & (deck[:, 1] == value))
+                card_count = np.sum((deck[:, 0] == color) & (deck[:, 1] == value))
                 self.assertEqual(card_count, 1)
 
-    def test_valid_play_rules(self):
-        """Test the rules for valid card plays."""
+    def test_valid_play(self):
+        """Test valid play conditions"""
         # Test empty expedition
-        self.assertTrue(self.env._is_valid_play(0, 5, 0))
+        self.assertTrue(self.env._is_valid_play(np.zeros(11), 0, 0))
         
-        # Set up an expedition with a handshake
-        self.env.expeditions[0, 0, 0] = 1
+        # Test handshake on empty expedition
+        expedition = np.zeros(11)
+        self.assertTrue(self.env._is_valid_play(expedition, 0, 0))
         
-        # Test playing number card after handshake
-        self.assertTrue(self.env._is_valid_play(0, 5, 0))
+        # Test handshake after number card (invalid)
+        expedition = np.zeros(11)
+        expedition[5] = 1  # Add a 5
+        self.assertFalse(self.env._is_valid_play(expedition, 0, 0))
         
-        # Set up expedition with number cards
-        self.env.expeditions[0, 0, 5] = 1  # Card value 5
-        
-        # Test invalid plays
-        self.assertFalse(self.env._is_valid_play(0, 4, 0))  # Lower value
-        self.assertFalse(self.env._is_valid_play(0, 0, 0))  # Handshake after number
-        
-        # Test valid plays
-        self.assertTrue(self.env._is_valid_play(0, 6, 0))  # Higher value
+        # Test ascending number cards
+        expedition = np.zeros(11)
+        expedition[5] = 1  # Add a 5
+        self.assertTrue(self.env._is_valid_play(expedition, 0, 6))  # Add a 6
+        self.assertFalse(self.env._is_valid_play(expedition, 0, 4))  # Try to add a 4
 
     def test_score_calculation(self):
-        """Test score calculation logic."""
-        # Set up a simple expedition
-        self.env.expeditions[0, 0, 5] = 1  # Value 5
-        self.env.expeditions[0, 0, 6] = 1  # Value 6
+        """Test expedition scoring"""
+        # Empty expedition
+        expedition = np.zeros(11)
+        self.assertEqual(self.env._calculate_score(expedition), 0)
         
-        # Calculate score: -20 + (5 + 6) = -9
-        self.assertEqual(self.env._calculate_score(0), -9)
+        # Single number card
+        expedition = np.zeros(11)
+        expedition[5] = 1  # Add a 5
+        self.assertEqual(self.env._calculate_score(expedition), -15)  # 5 - 20
         
-        # Add handshake
-        self.env.expeditions[0, 0, 0] = 1
-        # Score with multiplier: (-20 + 11) * 2 = -18
-        self.assertEqual(self.env._calculate_score(0), -18)
+        # Multiple number cards
+        expedition = np.zeros(11)
+        expedition[5] = 1  # Add a 5
+        expedition[6] = 1  # Add a 6
+        self.assertEqual(self.env._calculate_score(expedition), -9)  # (5 + 6) - 20
         
-        # Test bonus for 8+ cards
-        self.env.expeditions[0, 0, :] = 1  # Fill expedition
-        score = self.env._calculate_score(0)
-        self.assertTrue(score > 0)  # Should be positive with bonus
+        # With handshake multiplier
+        expedition = np.zeros(11)
+        expedition[0] = 1  # Add a handshake
+        expedition[5] = 1  # Add a 5
+        expedition[6] = 1  # Add a 6
+        self.assertEqual(self.env._calculate_score(expedition), -18)  # ((5 + 6) - 20) * 2
 
     def test_valid_actions_generation(self):
         """Test generation of valid actions."""

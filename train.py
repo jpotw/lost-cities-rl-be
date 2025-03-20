@@ -5,8 +5,8 @@ from models.ppo_agent import PPOAgent
 import torch
 
 # Hyperparameters 
-STATE_SIZE = 221
-ACTION_SIZE = 8 * 2 * 6
+STATE_SIZE = 265
+ACTION_SIZE = 8 * 2 * 7  # 8 cards × 2 actions (play/discard) × 7 draw sources (deck + 6 discard piles)
 HIDDEN_SIZE = 256
 LEARNING_RATE = 3e-4
 GAMMA = 0.99

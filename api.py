@@ -4,9 +4,10 @@ from models.model import LostCitiesNet
 from models.ppo_agent import PPOAgent
 from game.lost_cities_env import LostCitiesEnv
 import torch
-from typing import Union, List, Dict, Any
+from typing import Union, List, Dict, Any, Optional
 from train import load_model
 import os
+import numpy as np
 
 app = FastAPI()
 
@@ -14,39 +15,39 @@ app = FastAPI()
 api_instance = None
 
 class Card(BaseModel):
-    id: int
-    suit: str
-    value: Union[str, int]
-    isHidden: bool
+    id: Optional[str] = None
+    color: str
+    value: Union[str, int]  # "HS" or number 2-10
+    isHidden: Optional[bool] = None
 
-class PlayerState(BaseModel):
-    id: str
-    name: str
-    type: str
-    hand: list[Card]
-    expeditions: dict[str, list[Card]]
-    score: int
+class Player(BaseModel):
+    id: Optional[str] = None
+    name: Optional[str] = None
+    type: Optional[str] = None
+    hand: List[Card]
+    expeditions: Dict[str, List[Card]]
+    score: Optional[int] = None
 
 class GameState(BaseModel):
-    players: list[PlayerState]
-    currentPlayerIndex: int
-    deck: list[Card]
-    discardPiles: dict[str, list[Card]]
-    selectedCard: Union[Card, None]
-    gamePhase: str
-    isAIThinking: Union[bool, None] = None
-    lastDiscarded: Union[dict[str, Union[str, int]], None] = None # str(suit), str(handshake cards) | value(number cards)
-    winner: Union[str, None] = None
+    players: List[Player]
+    currentPlayerIndex: Optional[int] = None
+    currentPlayer: Optional[int] = None  # For backward compatibility
+    deck: Optional[List[Card]] = None
+    discardPiles: Dict[str, List[Card]]
+    selectedCard: Optional[Card] = None
+    gamePhase: Optional[str] = None
+    isAIThinking: Optional[bool] = None
+    lastDiscarded: Optional[Dict] = None
+    winner: Optional[Union[str, int]] = None
 
 class AIMoveResponse(BaseModel):
     action: tuple[int, int, int]
 
-
-# Calculate state size based on environment dimensions
-NUM_SUITS = 6
+# Constants
+NUM_COLORS = 6
 NUM_VALUES = 11  # 0 (handshake) and 2-10 (number cards)
-STATE_SIZE = NUM_SUITS * NUM_VALUES * 4 + 1  # 4 flattened arrays (66 each) + deck size
-ACTION_SIZE = 8 * 2 * 7  # 8 cards × 2 actions (play/discard) × 7 draw sources
+STATE_SIZE = 265  # Match the saved model's state size
+ACTION_SIZE = 8 * 2 * 7  # 8 cards × 2 actions (play/discard) × 7 draw sources (main deck + 6 discard piles)
 HIDDEN_SIZE = 256
 
 # Create model and ensure it's on CPU for testing
@@ -102,54 +103,43 @@ class LostCitiesAPI:
         # Convert environment state to GameState format
         game_state = GameState(
             players=[
-                PlayerState(
-                    id="0",
-                    name="Player",
+                Player(
+                    id="player1",
+                    name="Human",
                     type="HUMAN",
                     hand=[
                         Card(
-                            id=i,
-                            suit=self.env.index_to_suit(card[0]),
-                            value="HS" if card[1] == 0 else str(card[1]),
-                            isHidden=False
+                            id=f"p1_card_{i}",
+                            color=self.env.index_to_color(card[0]),
+                            value="HS" if card[1] == 0 else str(card[1])
                         )
                         for i, card in enumerate(self.env.get_player_hand(0))
                     ],
-                    expeditions={suit: [] for suit in ["RED", "BLUE", "GREEN", "WHITE", "YELLOW", "PURPLE"]},
+                    expeditions={color: [] for color in ["RED", "BLUE", "GREEN", "WHITE", "YELLOW", "PURPLE"]},
                     score=0
                 ),
-                PlayerState(
-                    id="1",
+                Player(
+                    id="player2",
                     name="AI",
                     type="AI",
                     hand=[
                         Card(
-                            id=i + 8,
-                            suit=self.env.index_to_suit(card[0]),
-                            value="HS" if card[1] == 0 else str(card[1]),
-                            isHidden=True
+                            id=f"p2_card_{i}",
+                            color=self.env.index_to_color(card[0]),
+                            value="HS" if card[1] == 0 else str(card[1])
                         )
                         for i, card in enumerate(self.env.get_player_hand(1))
                     ],
-                    expeditions={suit: [] for suit in ["RED", "BLUE", "GREEN", "WHITE", "YELLOW", "PURPLE"]},
+                    expeditions={color: [] for color in ["RED", "BLUE", "GREEN", "WHITE", "YELLOW", "PURPLE"]},
                     score=0
                 )
             ],
+            discardPiles={color: [] for color in ["RED", "BLUE", "GREEN", "WHITE", "YELLOW", "PURPLE"]},
             currentPlayerIndex=0,
-            deck=[
-                Card(
-                    id=i + 16,
-                    suit=self.env.index_to_suit(card[0]),
-                    value="HS" if card[1] == 0 else str(card[1]),
-                    isHidden=True
-                )
-                for i, card in enumerate(self.env.deck)
-            ],
-            discardPiles={suit: [] for suit in ["RED", "BLUE", "GREEN", "WHITE", "YELLOW", "PURPLE"]},
-            selectedCard=None,
+            currentPlayer=0,
+            deck=[Card(id=f"deck_{i}", color="HIDDEN", value="0") for i in range(len(self.env.deck))],  # Use HIDDEN color and "0" value for deck cards
             gamePhase="PLAY",
             isAIThinking=False,
-            lastDiscarded=None,
             winner=None
         )
         
@@ -198,7 +188,10 @@ async def get_ai_move(game_state: GameState):
         env_state = env.reset()
         
         # Set current player
-        env.current_player = game_state.currentPlayerIndex
+        current_player = game_state.currentPlayer if game_state.currentPlayer is not None else game_state.currentPlayerIndex
+        if current_player is None:
+            current_player = 0  # Default to first player if not specified
+        env.current_player = current_player
         
         # Clear initial state
         env.player_hands.fill(0)
@@ -209,26 +202,29 @@ async def get_ai_move(game_state: GameState):
         for player_idx, player in enumerate(game_state.players):
             # Convert hand
             for card in player.hand:
+                # Skip hidden cards (deck placeholders)
+                if card.color == "HIDDEN":
+                    continue
                 value = 0 if card.value == "HS" else int(card.value)
-                env.player_hands[player_idx][suit_to_index(card.suit)][value] += 1
+                env.player_hands[player_idx][color_to_index(card.color)][value] += 1
             
             # Convert expeditions
-            for suit, cards in player.expeditions.items():
+            for color, cards in player.expeditions.items():
                 for card in cards:
+                    # Skip hidden cards
+                    if card.color == "HIDDEN":
+                        continue
                     value = 0 if card.value == "HS" else int(card.value)
-                    env.expeditions[player_idx][suit_to_index(suit)][value] += 1
+                    env.expeditions[player_idx][color_to_index(color)][value] += 1
 
         # Convert discard piles
-        for suit, cards in game_state.discardPiles.items():
+        for color, cards in game_state.discardPiles.items():
             for card in cards:
+                # Skip hidden cards
+                if card.color == "HIDDEN":
+                    continue
                 value = 0 if card.value == "HS" else int(card.value)
-                env.discard_piles[suit_to_index(suit)][value] += 1
-
-        # Convert deck
-        env.deck = []
-        for card in game_state.deck:
-            value = 0 if card.value == "HS" else int(card.value)
-            env.deck.append((suit_to_index(card.suit), value))
+                env.discard_piles[color_to_index(color)][value] += 1
 
         # Get the current state
         env_state = env._get_state()
@@ -240,7 +236,10 @@ async def get_ai_move(game_state: GameState):
         env_state = torch.from_numpy(env_state).float().to(device)
         
         # Get action from agent
-        decoded_action, action_index, _ = agent.select_action(env_state, valid_actions)
+        if api_instance is None or api_instance.agent is None:
+            raise HTTPException(status_code=500, detail="Agent not initialized")
+            
+        decoded_action, action_index, _ = api_instance.agent.select_action(env_state, valid_actions)
 
         # 3. Return the chosen action
         return AIMoveResponse(action=decoded_action)
@@ -261,10 +260,38 @@ async def start_game():
         print(f"Error in /start_game: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-def suit_to_index(suit: str) -> int:
-    """Convert suit string to index"""
-    suits = ["RED", "BLUE", "GREEN", "WHITE", "YELLOW", "PURPLE"]
-    return suits.index(suit)
+def color_to_index(color: str) -> int:
+    """Convert color string to index"""
+    # Handle special case for hidden cards
+    if color.upper() == "HIDDEN":
+        return 0  # Default to first color for hidden cards
+        
+    colors_upper = ["RED", "BLUE", "GREEN", "WHITE", "YELLOW", "PURPLE"]
+    colors_lower = ["red", "blue", "green", "white", "yellow", "purple"]
+    
+    if color.upper() in colors_upper:
+        return colors_upper.index(color.upper())
+    elif color.lower() in colors_lower:
+        return colors_lower.index(color.lower())
+    else:
+        raise ValueError(f"Unknown color: {color}")
+
+def index_to_color(index: int) -> str:
+    """Convert index to color string"""
+    colors = ["RED", "BLUE", "GREEN", "WHITE", "YELLOW", "PURPLE"]
+    return colors[index]
+
+def value_to_index(value: Union[str, int]) -> int:
+    """Convert value to index"""
+    if value == "HS":
+        return 0
+    return int(value)
+
+def index_to_value(index: int) -> Union[str, int]:
+    """Convert index to value"""
+    if index == 0:
+        return "HS"
+    return index
 
 # For testing the API directly
 if __name__ == "__main__":
