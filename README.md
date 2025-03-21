@@ -41,6 +41,15 @@ pre-commit install
 uvicorn api:app --reload --port 8080
 ```
 
+### Testing
+
+To run the tests:
+```bash
+pytest tests
+```
+
+Make sure to 
+
 ## Development Tooling
 
 The project uses pre-commit hooks to ensure code quality. These include:
