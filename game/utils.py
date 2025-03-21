@@ -43,18 +43,18 @@ def is_valid_play(expedition: NDArray[np.int8], color: int, value: int) -> bool:
         Handshake cards (value=0) can only be played when no other cards have been played.
     """
     # Get all cards played in this expedition
-    played_cards = np.where(expedition > 0)[0]
+    played_indices = np.where(expedition > 0)[0]
 
-    if len(played_cards) == 0:
-        return True
+    if len(played_indices) == 0:
+        return True  # Can play any card on empty expedition
 
     if value == 0:  # Handshake card
-        return False
+        return False  # Can't play handshake after other cards
 
-    # Get the highest value card played
-    highest_value = played_cards[-1]
+    # Get the highest value card played so far
+    highest_played_value = max(played_indices)  # Since indices match card values
 
-    return value > highest_value
+    return value > highest_played_value
 
 
 def calculate_score(expedition: NDArray[np.int8]) -> int:
@@ -106,7 +106,7 @@ def get_valid_actions(
     Returns:
         List[Tuple[int, int, int]]: List of valid actions, each represented as
             (card_index, play_or_discard, draw_source) where:
-            - card_index: Index of the card in the flattened hand
+            - card_index: Index of the card in hand (0 to N-1 where N is number of cards)
             - play_or_discard: 0 for play, 1 for discard
             - draw_source: 0 for deck, 1-6 for discard piles
     """
@@ -114,11 +114,17 @@ def get_valid_actions(
 
     # Get indices of cards in hand
     card_indices = np.where(hand[current_player] > 0)
+    
+    # Create a mapping of (color, value) to card_index
+    card_mapping = {}
+    for idx in range(len(card_indices[0])):
+        color, value = card_indices[0][idx], card_indices[1][idx]
+        card_mapping[(color, value)] = idx
 
     # For each card in hand
     for idx in range(len(card_indices[0])):
         color, value = card_indices[0][idx], card_indices[1][idx]
-        card_index = len(np.where(hand.flatten()[: color * num_values + value] > 0)[0])
+        card_index = card_mapping[(color, value)]
 
         # Check if card can be played
         if is_valid_play(expeditions[current_player, color], color, value):

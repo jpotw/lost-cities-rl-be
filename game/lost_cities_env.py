@@ -154,7 +154,13 @@ class LostCitiesEnv:
 
         # Convert card_index to color and value
         hand = self.player_hands[self.current_player]
-        flat_index = np.where(hand.flatten() > 0)[0][card_index]
+        available_cards = np.where(hand.flatten() > 0)[0]
+        
+        # Validate card_index
+        if card_index >= len(available_cards):
+            raise ValueError(f"Invalid card_index {card_index}. Only {len(available_cards)} cards available.")
+            
+        flat_index = available_cards[card_index]
         color, value = np.unravel_index(flat_index, hand.shape)
 
         # Remove card from hand

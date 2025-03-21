@@ -98,15 +98,19 @@ class PPOAgent:
             policy_logits, _ = self.model(state.unsqueeze(0))
 
         # Create a mask for valid actions
-        mask = (
-            torch.ones_like(policy_logits) * -1e9
-        )  # Initialize with large negative values
+        mask = torch.ones_like(policy_logits) * -1e9  # Initialize with large negative values
+        
+        # Get the maximum card index from valid actions to determine how many cards are in hand
+        max_card_index = max(action[0] for action in valid_actions) if valid_actions else -1
+        
+        # Mask out actions for non-existent cards
         for action_index in range(policy_logits.size(1)):
-            if any(
-                list(action) == list(self.decode_action(action_index))
-                for action in valid_actions
+            decoded_action = self.decode_action(action_index)
+            if decoded_action[0] <= max_card_index and any(
+                list(action) == list(decoded_action) for action in valid_actions
             ):
                 mask[0, action_index] = 0
+
         # Apply the mask
         masked_logits = policy_logits + mask
 
@@ -165,7 +169,16 @@ class PPOAgent:
         """
         returns = []
         R = 0
-        for r in reversed(rewards):
+        # Convert rewards to list and modify final reward to binary win/loss/draw
+        rewards_list = list(rewards)
+        if rewards_list[-1] > 0:  # Win
+            rewards_list[-1] = 1.0
+        elif rewards_list[-1] < 0:  # Loss
+            rewards_list[-1] = -1.0
+        else:  # Draw
+            rewards_list[-1] = 0.0
+            
+        for r in reversed(rewards_list):
             R = r + self.gamma * R
             returns.insert(0, R)
         return torch.tensor(returns, dtype=torch.float32).to(self.device)
@@ -209,20 +222,25 @@ class PPOAgent:
         # Get the policy and value from the model
         probs = F.softmax(policy_logits, dim=-1)
         m = torch.distributions.Categorical(probs)
-        log_probs = m.log_prob(actions)  # actions is now guaranteed to be a Tensor
+        log_probs = m.log_prob(actions)
 
         # PPO loss calculation
         ratio = torch.exp(log_probs - old_log_probs)
-        surr1 = ratio * advantages
+        
+        # Convert advantages to binary win/loss signal
+        binary_advantages = torch.sign(advantages)  # Convert to -1, 0, or 1
+        
+        surr1 = ratio * binary_advantages
         surr2 = (
-            torch.clamp(ratio, 1 - self.clip_ratio, 1 + self.clip_ratio) * advantages
+            torch.clamp(ratio, 1 - self.clip_ratio, 1 + self.clip_ratio) * binary_advantages
         )
 
         # Policy loss
         policy_loss = -torch.min(surr1, surr2).mean()
 
-        # Value loss
-        value_loss = F.mse_loss(values, returns)
+        # Value loss - predict only win/loss/draw
+        binary_returns = torch.sign(returns)  # Convert to -1, 0, or 1
+        value_loss = F.mse_loss(values, binary_returns)
 
         # Entropy loss (for exploration)
         entropy_loss = -m.entropy().mean()

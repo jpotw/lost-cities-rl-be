@@ -113,6 +113,18 @@ def train(
         device=device,
     )
 
+    # Initialize metrics
+    metrics = {
+        'wins': 0,
+        'losses': 0,
+        'draws': 0,
+        'total_games': 0,
+        'total_score': 0,
+        'episode_rewards': [],
+        'win_rate_history': [],
+        'avg_score_history': []
+    }
+
     for game in range(num_episodes):
         state = env.reset()
         done = False
@@ -126,6 +138,24 @@ def train(
             log_probs.append(log_prob)
             rewards.append(reward)
             state = next_state
+
+        # Update metrics
+        metrics['total_games'] += 1
+        metrics['episode_rewards'].append(sum(rewards))
+        metrics['total_score'] += sum(rewards)
+        
+        if env.winner == 0:  # AI wins
+            metrics['wins'] += 1
+        elif env.winner == 1:  # AI loses
+            metrics['losses'] += 1
+        else:  # Draw
+            metrics['draws'] += 1
+            
+        # Calculate running statistics
+        win_rate = metrics['wins'] / metrics['total_games']
+        avg_score = metrics['total_score'] / metrics['total_games']
+        metrics['win_rate_history'].append(win_rate)
+        metrics['avg_score_history'].append(avg_score)
 
         returns = agent.compute_returns(rewards)
         advantages = (
@@ -157,11 +187,26 @@ def train(
         if (game + 1) % PRINT_INTERVAL == 0:
             print(
                 f"Game: {game + 1}, Loss: {loss:.4f}, "
-                f"Reward: {sum(rewards):.2f}, Winner: {env.winner}"
+                f"Reward: {sum(rewards):.2f}, Winner: {env.winner}\n"
+                f"Win Rate: {win_rate:.2%}, Avg Score: {avg_score:.2f}\n"
+                f"W/L/D: {metrics['wins']}/{metrics['losses']}/{metrics['draws']}"
             )
         if (game + 1) % save_interval == 0:
             torch.save(agent.model.state_dict(), f"model_{game + 1}.pth")
+            # Save metrics
+            np.savez(f"metrics_{game + 1}.npz",
+                win_rate_history=np.array(metrics['win_rate_history']),
+                avg_score_history=np.array(metrics['avg_score_history']),
+                episode_rewards=np.array(metrics['episode_rewards'])
+            )
+    
     torch.save(agent.model.state_dict(), model_path)
+    # Save final metrics
+    np.savez("metrics_final.npz",
+        win_rate_history=np.array(metrics['win_rate_history']),
+        avg_score_history=np.array(metrics['avg_score_history']),
+        episode_rewards=np.array(metrics['episode_rewards'])
+    )
 
 
 if __name__ == "__main__":
