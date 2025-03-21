@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 import torch
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+import numpy as np
 
 from game.lost_cities_env import LostCitiesEnv
 from models.model import LostCitiesNet
@@ -384,6 +385,12 @@ def _convert_game_state_to_env(
 
     # Convert discard piles
     _convert_discard_piles(env, game_state.discardPiles)
+
+    # Update deck size to match frontend's deck
+    if game_state.deck is not None:
+        # Create a new deck with the correct size
+        # The actual card values don't matter since the AI only uses the deck size
+        env.deck = np.array([[-1, -1]] * len(game_state.deck), dtype=np.int8)
 
     # Get the current state and valid actions
     env_state = env._get_state()

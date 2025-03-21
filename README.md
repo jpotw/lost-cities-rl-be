@@ -48,7 +48,6 @@ To run the tests:
 pytest tests
 ```
 
-Make sure to 
 
 ## Development Tooling
 
