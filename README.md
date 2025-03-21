@@ -1,16 +1,12 @@
 ---
 title: Lost Cities RL Backend
 emoji: 🎮
-colorFrom: blue
-colorTo: green
 sdk: docker
-sdk_version: "3.0"
 app_file: api.py
 app_port: 8080
 pinned: false
 ---
 
-Check out the configuration reference at https://huggingface.co/docs/hub/spaces-config-reference
 
 # Lost Cities RL Backend
 
@@ -18,24 +14,31 @@ This is the backend service for the Lost Cities Reinforcement Learning project.
 
 ## Development
 
-1. Install dependencies:
+1. Make a virtual environment(Optional but recommended) in the root directory:
+
+```bash
+python -m venv venv
+source venv/bin/activate
+```
+
+2. Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-2. For development, install additional tooling:
+3. For development, install additional tooling:
 ```bash
 pip install -r requirements-dev.txt
 ```
 
-3. Set up pre-commit hooks:
+4. Set up pre-commit hooks:
 ```bash
 pre-commit install
 ```
 
-4. Run the server:
+5. Run the server:
 ```bash
-uvicorn api:app --reload
+uvicorn api:app --reload --port 8080
 ```
 
 ## Development Tooling
@@ -67,8 +70,19 @@ If you have Docker Desktop installed in Windows and are using WSL:
 
 ### Building and Running
 
-To build and run locally:
+To run locally:
+```bash
+uvicorn api:app --reload --port 8080
+```
+
+or
+
+to build and run in a container:
+
 ```bash
 docker build -t lost-cities-rl-be .
 docker run -p 8080:8080 lost-cities-rl-be
 ```
+
+
+Also, check the [frontend repository](https://github.com/jpotw/lost-cities-rl-fe) to run with the frontend.
